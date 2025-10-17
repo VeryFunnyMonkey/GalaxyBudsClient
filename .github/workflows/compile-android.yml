@@ -1,8 +1,8 @@
-name: Compile Android binaries
+name: Compile Android APK
 
 on:
   push:
-    branches: [ master, project-upgrade ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
   release:
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-android:
+  build-arm64:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,55 +23,59 @@ jobs:
       with:
         dotnet-version: 8.0.101
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        api-levels: 34
-        components: build-tools;34.0.0
-
     - name: Install Android workload
-      run: dotnet workload install android
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y unzip wget openjdk-17-jdk
+        dotnet workload install android
 
     - name: Restore dependencies
-      working-directory: GalaxyBudsClient.Android
-      run: dotnet restore GalaxyBudsClient.Android.csproj
+      run: dotnet restore -r android-arm64 --configfile GalaxyBudsClient/nuget.config GalaxyBudsClient/GalaxyBudsClient.Android/GalaxyBudsClient.Android.csproj
 
-    - name: Build Android APK
-      working-directory: GalaxyBudsClient.Android
+    - name: Build Release APK
+      run: dotnet publish GalaxyBudsClient/GalaxyBudsClient.Android/GalaxyBudsClient.Android.csproj \
+        -f net8.0-android \
+        -c Release \
+        -r android-arm64 \
+        -p:EmbedAssembliesIntoApk=true \
+        -p:AndroidSupportedAbis=arm64-v8a \
+        -p:AndroidPackageFormat=apk \
+        -o bin_android
+
+    - name: Generate debug keystore
       run: |
-        dotnet publish -f net8.0-android -c Release \
-          -p:AndroidPackageFormats=apk \
-          -p:EmbedAssembliesIntoApk=true \
-          -p:NotDemo=true \
-          -p:DebugType=PdbOnly
+        mkdir -p keystore
+        keytool -genkeypair -v -keystore keystore/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Debug,O=Debug,L=Debug,ST=Debug,C=US"
 
-    - name: Find APK
-      id: find_apk
+    - name: Sign APK
       run: |
-        APK_PATH=$(find GalaxyBudsClient.Android/bin/Release -type f -name "*.apk" | head -n 1)
-        echo "apk=$APK_PATH" >> $GITHUB_OUTPUT
+        jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+        -keystore keystore/debug.keystore -storepass android -keypass android \
+        bin_android/*.apk androiddebugkey
 
-    - name: Upload artifact
+    - name: Align APK
+      run: |
+        zipalign -v 4 bin_android/*.apk bin_android/GalaxyBudsClient_arm64.apk
+
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: GalaxyBudsClient_Android
-        path: ${{ steps.find_apk.outputs.apk }}
+        name: GalaxyBudsClient_Android_arm64
+        path: bin_android/GalaxyBudsClient_arm64.apk
 
   attach-to-release:
-    runs-on: windows-latest
-    needs: build-android
+    runs-on: ubuntu-latest
+    needs: [build-arm64]
     if: github.event_name == 'release'
-     
+
     steps:
-    - name: Download artifact (Android)
+    - name: Download APK artifact
       uses: actions/download-artifact@v4
       with:
-        name: GalaxyBudsClient_Android
+        name: GalaxyBudsClient_Android_arm64
 
-    - name: Rename (Android)
-      run: ren *.apk GalaxyBudsClient_Android.apk
-
-    - uses: AButler/upload-release-assets@v2.0
+    - name: Attach APK to release
+      uses: AButler/upload-release-assets@v2.0
       with:
-        files: '*.apk'
+        files: bin_android/GalaxyBudsClient_arm64.apk
         repo-token: ${{ secrets.GH_TOKEN }}

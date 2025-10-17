@@ -15,6 +15,9 @@ jobs:
   build-universal:
     runs-on: macos-14
 
+    env:
+      DOTNET_DISABLE_WORKLOAD_EVALUATION: 1
+
     steps:
     - uses: actions/checkout@v4
     - name: Setup Xcode
@@ -52,6 +55,9 @@ jobs:
   build-x64:
     runs-on: macos-14
 
+    env:
+      DOTNET_DISABLE_WORKLOAD_EVALUATION: 1
+
     steps:
     - uses: actions/checkout@v4
     - name: Setup Xcode
@@ -88,6 +94,9 @@ jobs:
 
   build-arm64:
     runs-on: macos-14
+
+    env:
+      DOTNET_DISABLE_WORKLOAD_EVALUATION: 1
 
     steps:
     - uses: actions/checkout@v4

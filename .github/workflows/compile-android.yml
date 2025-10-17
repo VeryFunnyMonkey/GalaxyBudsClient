@@ -72,9 +72,8 @@ jobs:
 
     - name: Find APK
       id: find_apk
-      working-directory: GalaxyBudsClient.Android
       run: |
-        APK_PATH=$(find bin_android -type f -name "*.apk" | head -n 1)
+        APK_PATH=$(find GalaxyBudsClient.Android/bin_android -type f -name "*.apk" | head -n 1)
         echo "apk=$APK_PATH" >> $GITHUB_OUTPUT
 
     - name: Upload artifact

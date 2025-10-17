@@ -46,7 +46,7 @@ jobs:
         mkdir -p keystore
         keytool -genkeypair \
           -v \
-          -keystore GalaxyBudsClient.Android/keystore/debug.keystore \
+          -keystore keystore/debug.keystore \
           -storepass debugpass \
           -alias galaxybudsclient \
           -keyalg RSA \

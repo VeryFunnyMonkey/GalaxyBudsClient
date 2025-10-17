@@ -40,6 +40,19 @@ jobs:
       working-directory: GalaxyBudsClient.Android
       run: dotnet restore GalaxyBudsClient.Android.csproj
 
+    - name: Generate debug keystore
+      run: |
+        mkdir -p keystore
+        keytool -genkeypair \
+          -v \
+          -keystore keystore/debug.keystore \
+          -storepass debugpass \
+          -alias galaxybudsclient \
+          -keyalg RSA \
+          -keysize 2048 \
+          -validity 10000 \
+          -dname "CN=GalaxyBudsClient, OU=Dev, O=Org, L=City, ST=State, C=US"
+
     - name: Build Android APK
       working-directory: GalaxyBudsClient.Android
       run: |

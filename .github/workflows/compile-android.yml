@@ -1,8 +1,8 @@
-name: Compile Android APK
+name: Compile Android binaries
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, project-upgrade ]
   pull_request:
     branches: [ master ]
   release:
@@ -15,6 +15,10 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
     - uses: actions/checkout@v4
 
@@ -24,46 +28,62 @@ jobs:
         dotnet-version: 8.0.101
 
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v2
+      uses: android-actions/setup-android@v3
       with:
-        api-level: 34
-        ndk: 25.2.9519653
-        arch: arm64
-        cmdline-tools: latest
+        api-levels: 34
+        components: build-tools;34.0.0
 
-    - name: Generate debug keystore
+    - name: Install Android workload
+      run: dotnet workload install android
+
+    - name: Restore dependencies
+      working-directory: GalaxyBudsClient.Android
+      run: dotnet restore GalaxyBudsClient.Android.csproj
+
+    - name: Build Android APK
+      working-directory: GalaxyBudsClient.Android
       run: |
-        mkdir -p keystore
-        keytool -genkeypair -v \
-          -keystore keystore/debug.keystore \
-          -alias galaxybudsclient \
-          -keyalg RSA -keysize 2048 \
-          -validity 10000 \
-          -storepass debugpass \
-          -keypass debugpass \
-          -dname "CN=Debug, OU=Dev, O=Test, L=City, S=State, C=US"
-
-    - name: Restore workloads
-      run: dotnet workload restore
-
-    - name: Build Signed APK (arm64)
-      run: |
-        dotnet publish GalaxyBudsClient.Android/GalaxyBudsClient.Android.csproj \
+        dotnet publish GalaxyBudsClient.Android.csproj \
           -f net8.0-android \
           -c Release \
-          -r android-arm64 \
+          -p:AndroidPackageFormats=apk \
+          -p:EmbedAssembliesIntoApk=true \
+          -p:NotDemo=true \
           -p:AndroidKeyStore=true \
           -p:AndroidSigningKeyStore=keystore/debug.keystore \
           -p:AndroidSigningKeyAlias=galaxybudsclient \
           -p:AndroidSigningKeyPass=debugpass \
           -p:AndroidSigningStorePass=debugpass \
-          -p:AndroidPackageFormats=apk \
-          -p:EmbedAssembliesIntoApk=true \
-          -p:NotDebuggable=true \
           -o bin_android
 
-    - name: Upload APK artifact
+    - name: Find APK
+      id: find_apk
+      working-directory: GalaxyBudsClient.Android
+      run: |
+        APK_PATH=$(find bin_android -type f -name "*.apk" | head -n 1)
+        echo "apk=$APK_PATH" >> $GITHUB_OUTPUT
+
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: GalaxyBudsClient_android-arm64
-        path: bin_android/*.apk
+        name: GalaxyBudsClient_Android
+        path: ${{ steps.find_apk.outputs.apk }}
+
+  attach-to-release:
+    runs-on: windows-latest
+    needs: build-android
+    if: github.event_name == 'release'
+
+    steps:
+    - name: Download artifact (Android)
+      uses: actions/download-artifact@v4
+      with:
+        name: GalaxyBudsClient_Android
+
+    - name: Rename APK
+      run: ren *.apk GalaxyBudsClient_Android.apk
+
+    - uses: AButler/upload-release-assets@v2.0
+      with:
+        files: '*.apk'
+        repo-token: ${{ secrets.GH_TOKEN }}

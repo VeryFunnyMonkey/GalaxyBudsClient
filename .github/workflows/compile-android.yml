@@ -30,10 +30,10 @@ jobs:
         dotnet workload install android
 
     - name: Restore dependencies
-      run: dotnet restore -r android-arm64 --configfile GalaxyBudsClient/nuget.config GalaxyBudsClient/GalaxyBudsClient.Android/GalaxyBudsClient.Android.csproj
+      run: dotnet restore -r android-arm64 --configfile GalaxyBudsClient/nuget.config GalaxyBudsClient.Android/GalaxyBudsClient.Android.csproj
 
     - name: Build Release APK
-      run: dotnet publish GalaxyBudsClient/GalaxyBudsClient.Android/GalaxyBudsClient.Android.csproj \
+      run: dotnet publish GalaxyBudsClient.Android/GalaxyBudsClient.Android.csproj \
         -f net8.0-android \
         -c Release \
         -r android-arm64 \

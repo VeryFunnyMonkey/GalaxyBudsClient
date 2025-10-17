@@ -1,0 +1,74 @@
+name: Compile Android binaries
+
+on:
+  push:
+    branches: [ master, project-upgrade ]
+  pull_request:
+    branches: [ master ]
+  release:
+    types:
+      - published
+      - prereleased
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.101
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-levels: 34
+        components: build-tools;34.0.0
+
+    - name: Restore dependencies
+      working-directory: GalaxyBudsClient.Android
+      run: dotnet restore GalaxyBudsClient.Android.csproj
+
+    - name: Build Android APK
+      working-directory: GalaxyBudsClient.Android
+      run: |
+        dotnet publish -f net8.0-android -c Release \
+          -p:AndroidPackageFormats=apk \
+          -p:EmbedAssembliesIntoApk=true \
+          -p:NotDemo=true \
+          -p:DebugType=PdbOnly
+
+    - name: Find APK
+      id: find_apk
+      run: |
+        APK_PATH=$(find GalaxyBudsClient.Android/bin/Release -type f -name "*.apk" | head -n 1)
+        echo "apk=$APK_PATH" >> $GITHUB_OUTPUT
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: GalaxyBudsClient_Android
+        path: ${{ steps.find_apk.outputs.apk }}
+
+  attach-to-release:
+    runs-on: windows-latest
+    needs: build-android
+    if: github.event_name == 'release'
+     
+    steps:
+    - name: Download artifact (Android)
+      uses: actions/download-artifact@v4
+      with:
+        name: GalaxyBudsClient_Android
+
+    - name: Rename (Android)
+      run: ren *.apk GalaxyBudsClient_Android.apk
+
+    - uses: AButler/upload-release-assets@v2.0
+      with:
+        files: '*.apk'
+        repo-token: ${{ secrets.GH_TOKEN }}

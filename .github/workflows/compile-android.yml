@@ -29,6 +29,9 @@ jobs:
         api-levels: 34
         components: build-tools;34.0.0
 
+    - name: Install Android workload
+      run: dotnet workload install android
+
     - name: Restore dependencies
       working-directory: GalaxyBudsClient.Android
       run: dotnet restore GalaxyBudsClient.Android.csproj

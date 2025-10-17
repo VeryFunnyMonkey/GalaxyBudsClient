@@ -94,6 +94,9 @@ jobs:
         
     - name: Rename artifact (x64)
       run: ren GalaxyBudsClient.exe "Galaxy Buds Client.exe"
+
+    - name: Install NSIS
+      run: choco install nsis -y
     
     - name: Create nsis installer (x64)
       uses: joncloud/makensis-action@v4.1
